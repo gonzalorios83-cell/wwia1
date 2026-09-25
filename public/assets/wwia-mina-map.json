@@ -1,0 +1,148 @@
+{
+  "name": "mina",
+  "version": 2,
+  "width": 1672,
+  "height": 941,
+  "humanBase": {
+    "type": "humanBase",
+    "x": 31,
+    "y": 652
+  },
+  "aiBase": {
+    "type": "aiBase",
+    "x": 1134,
+    "y": 186
+  },
+  "resources": [
+    {
+      "type": "mineral",
+      "x": 83,
+      "y": 770
+    },
+    {
+      "type": "mineral",
+      "x": 144,
+      "y": 547
+    },
+    {
+      "type": "mineral",
+      "x": 92,
+      "y": 543
+    },
+    {
+      "type": "mineral",
+      "x": 1137,
+      "y": 125
+    },
+    {
+      "type": "mineral",
+      "x": 1012,
+      "y": 96
+    },
+    {
+      "type": "mineral",
+      "x": 919,
+      "y": 34
+    },
+    {
+      "type": "oil",
+      "x": 228,
+      "y": 636
+    },
+    {
+      "type": "oil",
+      "x": 240,
+      "y": 579
+    },
+    {
+      "type": "oil",
+      "x": 11,
+      "y": 719
+    },
+    {
+      "type": "water",
+      "x": 43,
+      "y": 691
+    },
+    {
+      "type": "water",
+      "x": 133,
+      "y": 593
+    },
+    {
+      "type": "water",
+      "x": 133,
+      "y": 445
+    },
+    {
+      "type": "water",
+      "x": 903,
+      "y": 64
+    },
+    {
+      "type": "water",
+      "x": 990,
+      "y": 139
+    },
+    {
+      "type": "water",
+      "x": 1141,
+      "y": 232
+    },
+    {
+      "type": "water",
+      "x": 252,
+      "y": 198
+    },
+    {
+      "type": "water",
+      "x": 786,
+      "y": 712
+    },
+    {
+      "type": "water",
+      "x": 598,
+      "y": 391
+    },
+    {
+      "type": "water",
+      "x": 1442,
+      "y": 739
+    },
+    {
+      "type": "water",
+      "x": 1465,
+      "y": 511
+    },
+    {
+      "type": "water",
+      "x": 1452,
+      "y": 330
+    },
+    {
+      "type": "water",
+      "x": 954,
+      "y": 765
+    },
+    {
+      "type": "oil",
+      "x": 1252,
+      "y": 109
+    },
+    {
+      "type": "oil",
+      "x": 1331,
+      "y": 173
+    },
+    {
+      "type": "oil",
+      "x": 1157,
+      "y": 307
+    }
+  ],
+  "navPalette": {
+    "green": "#30D481",
+    "black": "#121820",
+    "red": "#EE5D65"
+  }
+}

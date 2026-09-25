@@ -1,0 +1,105 @@
+{
+  "name": "Luna",
+  "displayName": "Luna",
+  "planet": "moon",
+  "description": "Sector lunar de baja gravedad, con horizonte negro y terreno gris mate.",
+  "cameraStart": {
+    "x": 520,
+    "y": 690,
+    "zoom": 1.05
+  },
+  "humanStart": {
+    "x": 310,
+    "y": 800
+  },
+  "aiStart": {
+    "x": 1395,
+    "y": 765
+  },
+  "movementProfile": {
+    "gravity": "low",
+    "friction": 0.9,
+    "acceleration": 0.82,
+    "turnRate": 0.75,
+    "drift": 0.18
+  },
+  "visualProfile": {
+    "spriteTint": "gray_matte",
+    "brightness": 0.82,
+    "saturate": 0.55,
+    "contrast": 0.96,
+    "shadow": 0.35
+  },
+  "resources": [
+    {
+      "type": "water",
+      "x": 145,
+      "y": 835
+    },
+    {
+      "type": "water",
+      "x": 250,
+      "y": 845
+    },
+    {
+      "type": "minerals",
+      "x": 385,
+      "y": 755
+    },
+    {
+      "type": "minerals",
+      "x": 680,
+      "y": 715
+    },
+    {
+      "type": "minerals",
+      "x": 1055,
+      "y": 735
+    },
+    {
+      "type": "minerals",
+      "x": 1300,
+      "y": 815
+    },
+    {
+      "type": "oil",
+      "x": 495,
+      "y": 835
+    },
+    {
+      "type": "oil",
+      "x": 1185,
+      "y": 855
+    }
+  ],
+  "id": "luna",
+  "mapSize": {
+    "width": 1672,
+    "height": 941
+  },
+  "image": "maps/luna.png",
+  "navMask": "nav/luna_nav.png",
+  "playablePolicy": "Nav técnico por color: #30D481 transitable, #121820 bloqueado, #FF5D65 lento.",
+  "bounds": {
+    "x": 0,
+    "y": 0,
+    "width": 1672,
+    "height": 941
+  },
+  "recommendedScale": {
+    "simulatedWidthKm": 2.0,
+    "simulatedHeightKm": 1.1
+  },
+  "notes": "Configuración inicial para testeo. Ajustar recursos/spawns después de jugar.",
+  "navTechnicalColors": {
+    "walkable": "#30D481",
+    "blocked": "#121820",
+    "slow": "#FF5D65"
+  },
+  "slowTerrain": {
+    "enabled": true,
+    "color": "#FF5D65",
+    "movementMultiplier": 0.65,
+    "notes": "Primera máscara lenta de testeo: polvo, cráteres, pendientes y zonas volcánicas."
+  }
+}

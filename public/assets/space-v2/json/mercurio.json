@@ -1,0 +1,105 @@
+{
+  "name": "Mercurio",
+  "displayName": "Mercurio",
+  "planet": "mercury",
+  "description": "Superficie gris-beige, quemada por el Sol, con cielo negro y estrellas.",
+  "cameraStart": {
+    "x": 520,
+    "y": 765,
+    "zoom": 1.08
+  },
+  "humanStart": {
+    "x": 325,
+    "y": 840
+  },
+  "aiStart": {
+    "x": 1380,
+    "y": 830
+  },
+  "movementProfile": {
+    "gravity": "hard_low",
+    "friction": 0.84,
+    "acceleration": 0.86,
+    "turnRate": 0.82,
+    "drift": 0.1
+  },
+  "visualProfile": {
+    "spriteTint": "warm_gray_beige",
+    "brightness": 0.8,
+    "saturate": 0.6,
+    "contrast": 1.0,
+    "shadow": 0.34
+  },
+  "resources": [
+    {
+      "type": "water",
+      "x": 170,
+      "y": 855
+    },
+    {
+      "type": "water",
+      "x": 285,
+      "y": 858
+    },
+    {
+      "type": "minerals",
+      "x": 430,
+      "y": 785
+    },
+    {
+      "type": "minerals",
+      "x": 735,
+      "y": 755
+    },
+    {
+      "type": "minerals",
+      "x": 1060,
+      "y": 775
+    },
+    {
+      "type": "minerals",
+      "x": 1310,
+      "y": 845
+    },
+    {
+      "type": "oil",
+      "x": 535,
+      "y": 865
+    },
+    {
+      "type": "oil",
+      "x": 1190,
+      "y": 872
+    }
+  ],
+  "id": "mercurio",
+  "mapSize": {
+    "width": 1672,
+    "height": 941
+  },
+  "image": "maps/mercurio.png",
+  "navMask": "nav/mercurio_nav.png",
+  "playablePolicy": "Nav técnico por color: #30D481 transitable, #121820 bloqueado, #FF5D65 lento.",
+  "bounds": {
+    "x": 0,
+    "y": 0,
+    "width": 1672,
+    "height": 941
+  },
+  "recommendedScale": {
+    "simulatedWidthKm": 2.0,
+    "simulatedHeightKm": 1.1
+  },
+  "notes": "Configuración inicial para testeo. Ajustar recursos/spawns después de jugar.",
+  "navTechnicalColors": {
+    "walkable": "#30D481",
+    "blocked": "#121820",
+    "slow": "#FF5D65"
+  },
+  "slowTerrain": {
+    "enabled": true,
+    "color": "#FF5D65",
+    "movementMultiplier": 0.65,
+    "notes": "Primera máscara lenta de testeo: polvo, cráteres, pendientes y zonas volcánicas."
+  }
+}

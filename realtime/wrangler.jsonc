@@ -1,0 +1,16 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "wwia-realtime",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-09-14",
+  "account_id": "28cf572c551eba5edf7e2260e6ba3f1e",
+  "durable_objects": {
+    "bindings": [
+      { "name": "ROOM", "class_name": "WwiaRoom" }
+    ]
+  },
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["WwiaRoom"] }
+  ],
+  "workers_dev": true
+}

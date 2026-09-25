@@ -1,0 +1,1 @@
+ALTER TABLE `multiplayer_rooms` ADD `snapshot_json` text;

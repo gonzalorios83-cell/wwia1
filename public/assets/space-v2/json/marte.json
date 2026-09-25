@@ -1,0 +1,105 @@
+{
+  "name": "Marte",
+  "displayName": "Marte — Olympus Mons",
+  "planet": "mars",
+  "description": "Sector marciano con Olympus Mons visible al horizonte. Perfil base para jugabilidad espacial.",
+  "cameraStart": {
+    "x": 520,
+    "y": 705,
+    "zoom": 1.05
+  },
+  "humanStart": {
+    "x": 320,
+    "y": 815
+  },
+  "aiStart": {
+    "x": 1370,
+    "y": 785
+  },
+  "movementProfile": {
+    "gravity": "low_moderate",
+    "friction": 0.86,
+    "acceleration": 0.88,
+    "turnRate": 0.85,
+    "drift": 0.12
+  },
+  "visualProfile": {
+    "spriteTint": "red_dust",
+    "brightness": 0.84,
+    "saturate": 0.75,
+    "contrast": 0.97,
+    "shadow": 0.35
+  },
+  "resources": [
+    {
+      "type": "water",
+      "x": 165,
+      "y": 835
+    },
+    {
+      "type": "water",
+      "x": 275,
+      "y": 850
+    },
+    {
+      "type": "minerals",
+      "x": 420,
+      "y": 760
+    },
+    {
+      "type": "minerals",
+      "x": 755,
+      "y": 725
+    },
+    {
+      "type": "minerals",
+      "x": 1065,
+      "y": 750
+    },
+    {
+      "type": "minerals",
+      "x": 1300,
+      "y": 805
+    },
+    {
+      "type": "oil",
+      "x": 520,
+      "y": 835
+    },
+    {
+      "type": "oil",
+      "x": 1210,
+      "y": 855
+    }
+  ],
+  "id": "marte",
+  "mapSize": {
+    "width": 1672,
+    "height": 941
+  },
+  "image": "maps/marte.png",
+  "navMask": "nav/marte_nav.png",
+  "playablePolicy": "Nav técnico por color: #30D481 transitable, #121820 bloqueado, #FF5D65 lento.",
+  "bounds": {
+    "x": 0,
+    "y": 0,
+    "width": 1672,
+    "height": 941
+  },
+  "recommendedScale": {
+    "simulatedWidthKm": 2.0,
+    "simulatedHeightKm": 1.1
+  },
+  "notes": "Configuración inicial para testeo. Ajustar recursos/spawns después de jugar.",
+  "navTechnicalColors": {
+    "walkable": "#30D481",
+    "blocked": "#121820",
+    "slow": "#FF5D65"
+  },
+  "slowTerrain": {
+    "enabled": true,
+    "color": "#FF5D65",
+    "movementMultiplier": 0.65,
+    "notes": "Primera máscara lenta de testeo: polvo, cráteres, pendientes y zonas volcánicas."
+  }
+}

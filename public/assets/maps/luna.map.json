@@ -1,0 +1,14 @@
+{
+  "name": "luna",
+  "version": 2,
+  "width": 1672,
+  "height": 932,
+  "humanBase": { "type": "humanBase", "x": 234, "y": 466 },
+  "aiBase": { "type": "aiBase", "x": 1437, "y": 466 },
+  "resources": [],
+  "navPalette": {
+    "green": "#30D481",
+    "black": "#121820",
+    "red": "#EE5D65"
+  }
+}
