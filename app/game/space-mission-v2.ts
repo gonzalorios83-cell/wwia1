@@ -38,7 +38,7 @@ export const SPACE_MISSION_V2: Record<SpaceMissionV2Id, SpaceMissionV2Config> = 
     resources: [{ type: "water", x: 170, y: 855 }, { type: "water", x: 285, y: 858 }, { type: "mineral", x: 430, y: 785 }, { type: "mineral", x: 735, y: 755 }, { type: "mineral", x: 1060, y: 775 }, { type: "mineral", x: 1310, y: 845 }, { type: "oil", x: 535, y: 865 }, { type: "oil", x: 1190, y: 872 }],
   },
   venus: {
-    ...common, label: "VENUS", map: "ATMÓSFERA DORADA", description: "Mundo volcánico amarillo-naranja, atmósfera densa y terreno hostil.", terrain: "/assets/space-v2/maps/venus.png", navigation: "/assets/space-v2/nav/venus_nav.png",
+    ...common, label: "VENUS", map: "ATMÓSFERA DORADA", description: "Mundo volcánico amarillo-naranja, atmósfera densa y terreno hostil.", terrain: "/assets/space-v2/maps/venus.webp", navigation: "/assets/space-v2/nav/venus_nav.png",
     camera: { x: 525, y: 680, zoom: 1.04 }, humanStart: { x: 325, y: 805 }, machineStart: { x: 1360, y: 790 }, movement: { friction: .78, acceleration: .72, turnRate: .7, drift: .08 }, visual: { brightness: .86, saturate: .78, contrast: .95, shadow: .38 },
     resources: [{ type: "water", x: 155, y: 825 }, { type: "water", x: 275, y: 842 }, { type: "mineral", x: 410, y: 745 }, { type: "mineral", x: 690, y: 715 }, { type: "mineral", x: 1050, y: 740 }, { type: "mineral", x: 1305, y: 810 }, { type: "oil", x: 520, y: 830 }, { type: "oil", x: 1190, y: 855 }],
   },
