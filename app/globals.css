@@ -34,7 +34,7 @@ button:focus-visible { outline: 2px solid #78cff8; outline-offset: 2px; }
 .game-shell {
   --top-h: 38px;
   --dock-h: 132px;
-  --side-w: 208px;
+  --side-w: 196px;
   --hud-font: 9.5px;
   position: relative;
   width: 100%;
@@ -47,15 +47,15 @@ button:focus-visible { outline: 2px solid #78cff8; outline-offset: 2px; }
   background: #090e10;
   transform-origin: 0 0;
 }
-.game-shell.ui-80 { --top-h: 40px; --dock-h: 102px; --side-w: 208px; --hud-font: 8.5px; }
-.game-shell.ui-90 { --top-h: 44px; --dock-h: 114px; --side-w: 226px; --hud-font: 9.5px; }
-.game-shell.ui-100 { --top-h: 48px; --dock-h: 126px; --side-w: 246px; --hud-font: 10.5px; }
-.game-shell.ui-110 { --top-h: 52px; --dock-h: 140px; --side-w: 268px; --hud-font: 11.5px; }
-.game-shell.ui-120 { --top-h: 56px; --dock-h: 154px; --side-w: 292px; --hud-font: 12.5px; }
-.game-shell.ui-130 { --top-h: 60px; --dock-h: 168px; --side-w: 316px; --hud-font: 13.5px; }
-.game-shell.ui-140 { --top-h: 64px; --dock-h: 182px; --side-w: 340px; --hud-font: 14.5px; }
-.game-shell.ui-150 { --top-h: 68px; --dock-h: 196px; --side-w: 364px; --hud-font: 15.5px; }
-.game-shell.ui-160 { --top-h: 72px; --dock-h: 184px; --side-w: 388px; --hud-font: 16.5px; }
+.game-shell.ui-80 { --top-h: 40px; --dock-h: 102px; --side-w: 196px; --hud-font: 8.5px; }
+.game-shell.ui-90 { --top-h: 44px; --dock-h: 114px; --side-w: 214px; --hud-font: 9.5px; }
+.game-shell.ui-100 { --top-h: 48px; --dock-h: 126px; --side-w: 232px; --hud-font: 10.5px; }
+.game-shell.ui-110 { --top-h: 52px; --dock-h: 140px; --side-w: 252px; --hud-font: 11.5px; }
+.game-shell.ui-120 { --top-h: 56px; --dock-h: 154px; --side-w: 274px; --hud-font: 12.5px; }
+.game-shell.ui-130 { --top-h: 60px; --dock-h: 168px; --side-w: 296px; --hud-font: 13.5px; }
+.game-shell.ui-140 { --top-h: 64px; --dock-h: 182px; --side-w: 318px; --hud-font: 14.5px; }
+.game-shell.ui-150 { --top-h: 68px; --dock-h: 196px; --side-w: 340px; --hud-font: 15.5px; }
+.game-shell.ui-160 { --top-h: 72px; --dock-h: 184px; --side-w: 362px; --hud-font: 16.5px; }
 .game-shell.game-briefing,
 .game-shell.game-ended { grid-template-rows: var(--top-h) minmax(0, 1fr) 0; }
 .game-shell.game-menu { grid-template-rows: minmax(0, 1fr) 0; }
@@ -192,11 +192,11 @@ button:focus-visible { outline: 2px solid #78cff8; outline-offset: 2px; }
 .help-trigger { position: absolute; z-index: 20; right: 1.1em; top: 1.1em; width: 3em; height: 3em; border: 2px solid rgba(238, 207, 119, .72); border-radius: 50%; color: #f1d98f; background: rgba(5, 10, 12, .94); box-shadow: 0 0 0 2px rgba(0,0,0,.35), 0 3px 14px rgba(0,0,0,.55); cursor: pointer; font-size: 1.05em; font-weight: 800; }
 .help-trigger:hover { border-color: var(--amber); color: var(--amber); }
 
-.intel-panel { z-index: 8; min-width: 0; padding: .7em; overflow-x: hidden; overflow-y: auto; border-left: 1px solid var(--line); background: linear-gradient(155deg, #121a1c, #090f11 82%); box-shadow: -10px 0 28px rgba(0, 0, 0, .28); font-size: var(--hud-font); }
-.intel-collapse { width: 100%; height: 2.8em; border: 1px solid var(--line); color: #9ba49f; background: #0d1517; cursor: pointer; font-size: .82em; letter-spacing: .1em; }
+.intel-panel { z-index: 8; min-width: 0; padding: .6em; overflow-x: hidden; overflow-y: auto; border-left: 1px solid var(--line); background: linear-gradient(155deg, #121a1c, #090f11 82%); box-shadow: -10px 0 28px rgba(0, 0, 0, .28); font-size: var(--hud-font); }
+.intel-collapse { width: 100%; height: 2.55em; border: 1px solid var(--line); color: #9ba49f; background: #0d1517; cursor: pointer; font-size: .82em; letter-spacing: .1em; }
 .intel-collapsed .intel-panel { padding: .7em .3em; overflow: hidden; }
 .intel-collapsed .intel-collapse { height: 100%; padding: 0; color: var(--blue); font-size: 1.6em; writing-mode: vertical-rl; }
-.intel-tabs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .35em; margin-top: .65em; }
+.intel-tabs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .35em; margin-top: .65em; }
 .intel-tabs button { min-width: 0; padding: .65em .25em; overflow: hidden; border: 1px solid var(--line); color: #7e8a85; background: #0b1214; cursor: pointer; font-size: .74em; letter-spacing: .055em; text-overflow: ellipsis; }
 .intel-tabs button.active { border-color: rgba(77,188,242,.48); color: #bdeaff; background: rgba(34,105,137,.22); }
 .intel-forces { display: grid; grid-template-columns: 1fr 1fr; gap: .5em; margin-top: .7em; }
@@ -228,7 +228,7 @@ button:focus-visible { outline: 2px solid #78cff8; outline-offset: 2px; }
 .merit-card b { color: #d8c38f; font-size: .9em; }
 .merit-card strong { color: var(--green); font-size: .75em; }
 .merit-card span { display: block; margin-top: .4em; color: #7d8984; font-size: .68em; line-height: 1.35; }
-.intel-tab-body { min-width: 0; padding-bottom: .8em; }
+.intel-tab-body { min-width: 0; padding-bottom: .45em; }
 .side-heading { display: flex; align-items: center; justify-content: space-between; gap: .6em; margin: 1em 0 .55em; color: #8e9994; font-size: .77em; letter-spacing: .09em; }
 .side-heading small, .side-heading kbd { color: #697773; font: .88em Arial; letter-spacing: .025em; }
 .empty-state { margin: .65em 0; color: #6f7b76; font-size: .82em; line-height: 1.35; }
@@ -268,11 +268,20 @@ button:focus-visible { outline: 2px solid #78cff8; outline-offset: 2px; }
 .delegate-levels { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: .3em; }
 .delegate-levels button, .doctrine-grid button, .doctrine-active button { min-width: 0; padding: .55em .25em; overflow: hidden; border: 1px solid var(--line); color: #8c9892; background: #0d1517; cursor: pointer; font-size: .64em; white-space: nowrap; text-overflow: ellipsis; }
 .delegate-levels button.active { border-color: rgba(223,185,96,.52); color: #e4d09f; background: rgba(86,65,27,.25); }
-.doctrine-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: .3em; margin-top: .35em; }
+.doctrine-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: .3em; margin-top: .35em; }
 .doctrine-grid button:hover, .doctrine-grid button.active { border-color: rgba(77,188,242,.5); color: #bdeaff; background: rgba(28,90,118,.2); }
 .doctrine-active { display: flex; align-items: center; justify-content: space-between; gap: .5em; margin-top: .45em; padding: .55em; border: 1px solid rgba(88,207,152,.32); background: rgba(34,107,75,.1); }
 .doctrine-active span { min-width: 0; overflow: hidden; color: var(--green); font-size: .68em; font-weight: 700; white-space: nowrap; text-overflow: ellipsis; }
 .doctrine-active button { flex: 0 0 auto; color: #a9c9b7; }
+.doctrine-summary { margin-top: .4em; padding: .6em; border: 1px solid rgba(223,185,96,.18); background: rgba(90,70,30,.06); }
+.doctrine-summary b, .doctrine-summary span, .doctrine-summary small { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.doctrine-summary b { color: #d9c999; font-size: .72em; letter-spacing: .035em; }
+.doctrine-summary span { margin-top: .22em; color: #8d9993; font-size: .67em; }
+.doctrine-summary small { margin-top: .25em; color: #c6a95f; font-size: .63em; }
+.group-assist-actions { display: grid; grid-template-columns: 1fr 1fr; gap: .3em; }
+.group-assist-actions button { min-width: 0; padding: .5em .35em; border: 1px solid rgba(77,188,242,.28); color: #acd5e6; background: #101b1f; cursor: pointer; font-size: .64em; font-weight: 700; }
+.group-assist-actions button + button { border-color: rgba(223,185,96,.30); color: #d5bf8b; background: #18170f; }
+.group-assist-actions button:hover { border-color: var(--blue); color: #e4f6fd; }
 .side-heading.sub { margin-top: .75em; padding-top: .65em; border-top: 1px solid var(--line); }
 .ai-level { display: grid; grid-template-columns: minmax(0,1fr) auto; align-items: center; gap: .55em; padding: .65em 0; border-bottom: 1px solid rgba(190,207,198,.09); }
 .ai-level > div:first-child { min-width: 0; }
