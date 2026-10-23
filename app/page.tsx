@@ -917,6 +917,15 @@ const formationUnitRadius = (unit: Pick<Unit, "side" | "type">) => {
   // sin modificar alcance, daño ni colisiones de combate.
   return Math.max(physical, visualHalfWidth * SPACE_UNIT_RENDER_SCALE * .90);
 };
+const transitUnitRadius = (unit: Pick<Unit, "side" | "type">) => {
+  const physical = unitFootprintRadius(unit);
+  if (!isSpaceScenario()) return physical;
+  const formation = formationUnitRadius(unit);
+  // Durante la marcha la separación es más suave que en el destino. Así la
+  // formación no obliga a las unidades a cruzarse o empujarse para quedar
+  // perfectas mientras todavía están avanzando.
+  return physical + (formation - physical) * .58;
+};
 const formationSpacingFor = (units: Unit[]) => {
   const maxRadius = units.reduce((largest, unit) => Math.max(largest, formationUnitRadius(unit)), 0);
   return clamp(maxRadius * 2 + 18, 62, isSpaceScenario() ? 190 : 116);
@@ -2210,28 +2219,13 @@ export default function Home() {
       if (Math.abs(angleDelta(towardNexus, orderedAngle)) < .68) telemetryRef.current.frontalOrders += 1;
     }
     if (isAttackOrder) { humanInitiatedHostilitiesRef.current = true; if (gameTimeRef.current < MOBILIZATION_TIME) setMessage("Iniciativa humana confirmada. La IA responderá en defensa."); }
-    const formationPriority = (unit: Unit) => unit.type === "artillery" ? 3 : UNIT_SPEC[unit.type].armor === "air" ? 2 : UNIT_SPEC[unit.type].armor === "infantry" ? 1 : 0;
-    // Frente blindado, infantería de apoyo y fuego indirecto atrás: cada fila
-    // queda perpendicular a la marcha y no depende del orden del clic.
-    const orderedSelected = [...selected].sort((a, b) => formationPriority(a) - formationPriority(b) || unitFootprintRadius(b) - unitFootprintRadius(a) || a.id - b.id);
-    const spacing = formationSpacingFor(orderedSelected);
-    // Sólo los botones Mover y Atacar en ruta forman una marcha coordinada.
-    // Una orden común sobre varias unidades conserva destino y velocidad propios.
+    const formationUnits = [...selected].sort((a, b) => a.id - b.id);
+    const spacing = formationSpacingFor(formationUnits);
+    // Sólo los botones Mover y Atacar en ruta fuerzan un ritmo común. La
+    // geometría final se usa para cualquier orden grupal, pero cada unidad
+    // conserva una ruta propia para evitar trayectorias cruzadas.
     const groupPace = groupCommand && selected.length > 1 ? Math.min(...selected.map(unit => UNIT_SPEC[unit.type].speed)) : undefined;
     const formationCenter = selected.reduce((sum, unit) => ({ x: sum.x + unit.x / selected.length, y: sum.y + unit.y / selected.length }), { x: 0, y: 0 });
-    const formationRoute = formationCommand ? routeAroundTerrain(formationCenter, target || point) : undefined;
-    const formationWaypoints = (lateral: number, depth: number, radius: number) => {
-      if (!formationRoute?.length) return [];
-      return formationRoute.map((anchor, routeIndex) => {
-        const previous = routeIndex ? formationRoute[routeIndex - 1] : formationCenter;
-        const following = formationRoute[routeIndex + 1] || (target || point);
-        const direction = Math.atan2(following.y - previous.y, following.x - previous.x);
-        return {
-          x: clamp(anchor.x - Math.sin(direction) * lateral + Math.cos(direction) * depth, radius, WORLD.w - radius),
-          y: clamp(anchor.y + Math.cos(direction) * lateral + Math.sin(direction) * depth, radius, WORLD.h - radius),
-        };
-      });
-    };
     const targetRadius = target ? ("complete" in target ? buildingFootprintRadius(target) : unitFootprintRadius(target)) : 0;
     const occupiedSlots: Array<{ unit: Unit; point: Point }> = [];
     const slotIsClear = (unit: Unit, candidate: Point) => {
@@ -2239,27 +2233,27 @@ export default function Home() {
       if (candidate.x < formationRadius || candidate.x > WORLD.w - formationRadius || candidate.y < formationRadius || candidate.y > WORLD.h - formationRadius) return false;
       if (UNIT_SPEC[unit.type].armor !== "air" && hasGroundNavigation() && !urbanWalkable(candidate)) return false;
       if (UNIT_SPEC[unit.type].armor !== "air" && !hasGroundNavigation() && activeProfile().obstacles.some(obstacle => distance(candidate, obstacle) < obstacle.r + footprint + 4)) return false;
-      if (buildingsRef.current.some(building => building.complete && distance(candidate, building) < buildingFootprintRadius(building) + formationRadius + 8)) return false;
+      if (buildingsRef.current.some(building => building.complete && building.id !== target?.id && distance(candidate, building) < buildingFootprintRadius(building) + formationRadius + 8)) return false;
       if (occupiedSlots.some(occupied => distance(candidate, occupied.point) < formationRadius + formationUnitRadius(occupied.unit) + 12)) return false;
       return routeForUnit(unit, candidate).length > 0;
     };
     const nearestValidSlot = (unit: Unit, preferred: Point) => {
       const candidates = [{ ...preferred }];
-      const searchRadii = [spacing * .32, spacing * .58, spacing * .88, spacing * 1.2, spacing * 1.56];
+      const searchRadii = [spacing * .28, spacing * .52, spacing * .78, spacing * 1.08, spacing * 1.42];
       for (const radius of searchRadii) for (let step = 0; step < 12; step++) {
         const angle = (Math.PI * 2 * step) / 12 + (unit.id % 5) * .12;
         candidates.push({ x: preferred.x + Math.cos(angle) * radius, y: preferred.y + Math.sin(angle) * radius });
       }
       return candidates.find(candidate => slotIsClear(unit, candidate));
     };
-    const orders = orderedSelected.map((unit, index) => {
+    const preferredSlotFor = (unit: Unit, index: number) => {
       const col = index % columns, row = Math.floor(index / columns);
       const lateral = (col - (columns - 1) / 2) * spacing, depth = ((rows - 1) / 2 - row) * spacing;
-      const unitRadius = unitFootprintRadius(unit);
       const direction = Math.atan2(point.y - formationCenter.y, point.x - formationCenter.x);
-      const approachAngle = Math.atan2(formationCenter.y - (target?.y ?? point.y), formationCenter.x - (target?.x ?? point.x));
-      const attackArc = Math.min(Math.PI * 1.55, Math.max(Math.PI * .62, (orderedSelected.length - 1) * .42));
-      const slotAngle = approachAngle + (orderedSelected.length > 1 ? (index / (orderedSelected.length - 1) - .5) * attackArc : 0);
+      if (!target) return { x: point.x - Math.sin(direction) * lateral + Math.cos(direction) * depth, y: point.y + Math.cos(direction) * lateral + Math.sin(direction) * depth };
+      const approachAngle = Math.atan2(formationCenter.y - target.y, formationCenter.x - target.x);
+      const attackArc = Math.min(Math.PI * 1.55, Math.max(Math.PI * .62, (selected.length - 1) * .42));
+      const slotAngle = approachAngle + (selected.length > 1 ? (index / (selected.length - 1) - .5) * attackArc : 0);
       const formationRadius = formationUnitRadius(unit);
       const minimumAttackRadius = targetRadius + formationRadius + 14;
       const minRange = UNIT_SPEC[unit.type].minRange ?? 0;
@@ -2267,18 +2261,37 @@ export default function Home() {
       const preferredAttackRadius = Math.max(minimumAttackRadius, minRange ? minRange + 34 : 0, tacticalRange);
       const maximumAttackRadius = Math.max(minimumAttackRadius, UNIT_SPEC[unit.type].range - 12);
       const attackRadius = Math.min(preferredAttackRadius, maximumAttackRadius);
-      const preferredTarget = target
-        ? { x: target.x + Math.cos(slotAngle) * attackRadius, y: target.y + Math.sin(slotAngle) * attackRadius }
-        : { x: point.x - Math.sin(direction) * lateral + Math.cos(direction) * depth, y: point.y + Math.cos(direction) * lateral + Math.sin(direction) * depth };
-      const formationTarget = nearestValidSlot(unit, preferredTarget);
-      if (!formationTarget) return { unit, order: undefined as UnitOrder | undefined };
-      occupiedSlots.push({ unit, point: formationTarget });
-      const destination = { x: clamp(formationTarget.x, UNIT_SPEC[unit.type].radius, WORLD.w - UNIT_SPEC[unit.type].radius), y: clamp(formationTarget.y, UNIT_SPEC[unit.type].radius, WORLD.h - UNIT_SPEC[unit.type].radius) };
-      const sharedRoute = formationCommand ? formationWaypoints(lateral, depth, UNIT_SPEC[unit.type].radius) : undefined;
-      const route = sharedRoute?.length ? [...sharedRoute.slice(0, -1), destination] : routeForUnit(unit, destination);
-      return { unit, order: { kind: target ? "attack" : isAttackOrder ? "attackMove" : "move", targetId: target?.id, waypoints: route, groupPace, formationSlot: { ...destination } } as UnitOrder };
-    });
-    if (orders.some(({ order }) => !order?.waypoints.length)) {
+      return { x: target.x + Math.cos(slotAngle) * attackRadius, y: target.y + Math.sin(slotAngle) * attackRadius };
+    };
+    // Asignación aproximada de coste mínimo: se elige en cada paso la pareja
+    // unidad-slot más cercana. Esto conserva la forma final sin obligar a dos
+    // unidades a intercambiar posiciones y cruzarse durante la marcha.
+    const remainingUnits = [...formationUnits];
+    const remainingSlots = Array.from({ length: formationUnits.length }, (_, index) => index);
+    const orders: Array<{ unit: Unit; order: UnitOrder | undefined }> = [];
+    while (remainingUnits.length && remainingSlots.length) {
+      let bestUnitIndex = -1, bestSlotIndex = -1, bestDestination: Point | undefined, bestRoute: Point[] | undefined, bestScore = Infinity;
+      for (let unitIndex = 0; unitIndex < remainingUnits.length; unitIndex++) {
+        const unit = remainingUnits[unitIndex];
+        for (let slotIndex = 0; slotIndex < remainingSlots.length; slotIndex++) {
+          const formationIndex = remainingSlots[slotIndex];
+          const preferred = preferredSlotFor(unit, formationIndex);
+          const valid = nearestValidSlot(unit, preferred);
+          if (!valid) continue;
+          const destination = { x: clamp(valid.x, UNIT_SPEC[unit.type].radius, WORLD.w - UNIT_SPEC[unit.type].radius), y: clamp(valid.y, UNIT_SPEC[unit.type].radius, WORLD.h - UNIT_SPEC[unit.type].radius) };
+          const route = routeForUnit(unit, destination);
+          if (!route.length) continue;
+          const score = distance(unit, destination);
+          if (score < bestScore) { bestScore = score; bestUnitIndex = unitIndex; bestSlotIndex = slotIndex; bestDestination = destination; bestRoute = route; }
+        }
+      }
+      if (bestUnitIndex < 0 || bestSlotIndex < 0 || !bestDestination || !bestRoute) break;
+      const unit = remainingUnits.splice(bestUnitIndex, 1)[0];
+      remainingSlots.splice(bestSlotIndex, 1);
+      occupiedSlots.push({ unit, point: bestDestination });
+      orders.push({ unit, order: { kind: target ? "attack" : isAttackOrder ? "attackMove" : "move", targetId: target?.id, waypoints: bestRoute, groupPace, formationSlot: { ...bestDestination } } });
+    }
+    if (orders.length !== selected.length || orders.some(({ order }) => !order?.waypoints.length)) {
       cancelUnitTargeting();
       setMessage("Orden cancelada: destino inaccesible.");
       return;
@@ -2877,12 +2890,15 @@ export default function Home() {
         const inRange = target && (artilleryMachineGun ? targetDistance < 190 : targetDistance <= spec.range && targetDistance >= (spec.minRange || 0));
         const orderedStructureTarget = orderedTarget && orderedTarget.hp > 0 && unit.order?.targetId === orderedTarget.id && "complete" in orderedTarget ? orderedTarget : undefined;
         const needsFormationSettle = Boolean(orderedStructureTarget && target === orderedStructureTarget && unit.order?.formationSlot && distance(unit, unit.order.formationSlot) > Math.max(12, formationUnitRadius(unit) * .38) && staticPositionClear(unit, unit.order.formationSlot));
-        if (needsFormationSettle && unit.order && unit.order.formationSlot && !unit.order.waypoints.length) {
+        if (needsFormationSettle && !inRange && unit.order && unit.order.formationSlot && !unit.order.waypoints.length) {
           const settlingRoute = routeForUnit(unit, unit.order.formationSlot);
           if (settlingRoute.length) unit.order.waypoints = settlingRoute;
         }
         const canFire = unit.side === "human" || machineCanEngage;
-        if (canFire && target && inRange && spec.damage > 0 && !needsFormationSettle) {
+        // El combate siempre tiene prioridad sobre acomodarse en formación. Si
+        // el blanco está en alcance, dispara aunque todavía no haya recuperado
+        // el slot asignado alrededor del objetivo.
+        if (canFire && target && inRange && spec.damage > 0) {
           unit.moveSpeed = Math.max(0, unit.moveSpeed - spec.speed * 2.4 * dt);
           const aimTurnRate = LOCOMOTION_CONFIG[unit.type].aimTurnRate;
           unit.angle += clamp(angleDelta(unit.angle, Math.atan2(target.y - unit.y, target.x - unit.x)), -aimTurnRate * dt, aimTurnRate * dt);
@@ -2928,7 +2944,7 @@ export default function Home() {
         let separateX = 0, separateY = 0;
         for (const other of unitsRef.current) {
           if (other.id === unit.id || other.side !== unit.side) continue;
-          const gap = distance(unit, other), desired = isSpaceScenario() ? formationUnitRadius(unit) + formationUnitRadius(other) + 10 : unitFootprintRadius(unit) + unitFootprintRadius(other) + 18;
+          const gap = distance(unit, other), desired = isSpaceScenario() ? transitUnitRadius(unit) + transitUnitRadius(other) + 8 : unitFootprintRadius(unit) + unitFootprintRadius(other) + 18;
           if (gap > 0 && gap < desired) { separateX += (unit.x - other.x) / gap * (desired - gap) / desired; separateY += (unit.y - other.y) / gap * (desired - gap) / desired; }
         }
         for (const building of isAir && !isHoverScenario() ? [] : buildingsRef.current) {
@@ -2944,7 +2960,7 @@ export default function Home() {
           const separationSize = Math.hypot(separateX, separateY);
           if (separationSize > .32) { separateX = separateX / separationSize * .32; separateY = separateY / separationSize * .32; }
         }
-        const separationWeight = constrainedGround ? .24 : activeScenario === "egypt" ? (isVehicle ? .78 : .90) : isVehicle ? .48 : .82;
+        const separationWeight = constrainedGround ? .24 : isSpaceScenario() ? (isVehicle ? .32 : .58) : activeScenario === "egypt" ? (isVehicle ? .78 : .90) : isVehicle ? .48 : .82;
         const length = Math.hypot(dx + separateX * separationWeight, dy + separateY * separationWeight) || 1;
         const desiredX = (dx + separateX * separationWeight) / length, desiredY = (dy + separateY * separationWeight) / length;
         const desiredAngle = Math.atan2(desiredY, desiredX);
@@ -2975,7 +2991,7 @@ export default function Home() {
             const relativeX = other.x - unit.x, relativeY = other.y - unit.y;
             const ahead = relativeX * desiredX + relativeY * desiredY;
             const lateral = Math.abs(relativeX * desiredY - relativeY * desiredX);
-            const clearance = unitFootprintRadius(unit) + unitFootprintRadius(other) + 12;
+            const clearance = isSpaceScenario() ? transitUnitRadius(unit) + transitUnitRadius(other) + 8 : unitFootprintRadius(unit) + unitFootprintRadius(other) + 12;
             if (ahead <= 0 || ahead >= clearance * 1.85 || lateral >= clearance * .72) continue;
             const otherWaypoint = other.order?.waypoints[0];
             const otherDirection = otherWaypoint ? { x: otherWaypoint.x - other.x, y: otherWaypoint.y - other.y } : undefined;
@@ -3036,8 +3052,8 @@ export default function Home() {
       for (let index = 0; index < unitsRef.current.length; index++) for (let otherIndex = index + 1; otherIndex < unitsRef.current.length; otherIndex++) {
         const first = unitsRef.current[index], second = unitsRef.current[otherIndex], firstSpec = UNIT_SPEC[first.type], secondSpec = UNIT_SPEC[second.type];
         if (activeScenario !== "egypt" && (firstSpec.armor === "air" || secondSpec.armor === "air")) continue;
-        const minimum = isSpaceScenario() ? formationUnitRadius(first) + formationUnitRadius(second) : unitFootprintRadius(first) + unitFootprintRadius(second), gap = distance(first, second);
-        const separationThreshold = activeScenario === "egypt" ? .9 : isSpaceScenario() ? .82 : .72;
+        const minimum = isSpaceScenario() ? transitUnitRadius(first) + transitUnitRadius(second) : unitFootprintRadius(first) + unitFootprintRadius(second), gap = distance(first, second);
+        const separationThreshold = activeScenario === "egypt" ? .9 : isSpaceScenario() ? .78 : .72;
         if (gap >= minimum * separationThreshold) continue;
         const angle = gap > .01 ? Math.atan2(first.y - second.y, first.x - second.x) : (first.id < second.id ? 0 : Math.PI);
         const correction = Math.min((minimum - gap) * (activeScenario === "egypt" ? .56 : .38), activeScenario === "egypt" ? 11 : 7);
