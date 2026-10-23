@@ -902,9 +902,24 @@ const unitFootprintRadius = (unit: Pick<Unit, "side" | "type">) => {
 };
 const buildingVisualScale = (building: Pick<Building, "side" | "type">) => isSpaceScenario() ? SPACE_BUILDING_RENDER_SCALE : activeScenario === "egypt" && building.side === "machine" ? (building.type === "hq" ? 1.9 : 1.6) : 1;
 const buildingFootprintRadius = (building: Pick<Building, "side" | "type">) => BUILDING_SPEC[building.type].radius * (activeScenario === "egypt" && building.side === "machine" ? (building.type === "hq" ? 1.55 : 1.35) : 1);
+const formationUnitRadius = (unit: Pick<Unit, "side" | "type">) => {
+  const physical = unitFootprintRadius(unit);
+  if (!isSpaceScenario()) return physical;
+  const visualHalfWidth = unit.type === "rifle" || unit.type === "antitank" || unit.type === "gravityHover" ? 21
+    : unit.type === "reconDrone" ? 20
+    : unit.type === "attackDrone" ? 23
+    : unit.type === "recon" ? 29
+    : unit.type === "apc" ? 34
+    : unit.type === "tank" || unit.type === "artillery" ? 41
+    : physical;
+  // El sprite espacial se dibuja bastante más grande que su colisión lógica.
+  // La formación usa una huella visual independiente para evitar solapamientos
+  // sin modificar alcance, daño ni colisiones de combate.
+  return Math.max(physical, visualHalfWidth * SPACE_UNIT_RENDER_SCALE * .90);
+};
 const formationSpacingFor = (units: Unit[]) => {
-  const maxRadius = units.reduce((largest, unit) => Math.max(largest, unitFootprintRadius(unit)), 0);
-  return clamp(maxRadius * 2 + 30, 62, 116);
+  const maxRadius = units.reduce((largest, unit) => Math.max(largest, formationUnitRadius(unit)), 0);
+  return clamp(maxRadius * 2 + 18, 62, isSpaceScenario() ? 190 : 116);
 };
 
 function spriteSize(type: UnitType, side: Side = "human"): [number, number] {
@@ -1008,9 +1023,21 @@ const directionalSpaceAsset = (unit: Unit): { key: string; flip: boolean; direct
   if (type === "recon" && direction === "upLeft") return { key: "human:recon:space:upRight", flip: true, direction };
   return { key: `human:${type}:space:${direction}`, flip: false, direction };
 };
+const machineSpaceSpriteFlip = (direction: VehicleDirection) => direction === "left" || direction === "upLeft" || direction === "downLeft";
+const machineSpaceSpriteRotation = (direction: VehicleDirection) => ({
+  right: 0,
+  left: 0,
+  upRight: -.14,
+  upLeft: -.14,
+  downRight: .14,
+  downLeft: .14,
+  up: -.22,
+  down: .22,
+}[direction]);
 const directionalSpaceMachineAsset = (unit: Unit): { key: string; flip: boolean; direction: VehicleDirection } | undefined => {
   if (unit.side !== "machine" || !isSpaceScenario() || !["rifle", "antitank", "recon", "apc", "tank", "artillery"].includes(unit.type)) return undefined;
-  return { key: `machine:${unit.type}`, flip: false, direction: spaceSpriteDirection(unit) };
+  const direction = spaceSpriteDirection(unit);
+  return { key: `machine:${unit.type}`, flip: machineSpaceSpriteFlip(direction), direction };
 };
 const directionalInfantryAsset = (unit: Unit): { key: string; flip: boolean; direction: VehicleDirection } | undefined => {
   if (unit.side !== "human" || isHoverScenario() || !["rifle", "antitank"].includes(unit.type)) return undefined;
@@ -2173,7 +2200,8 @@ export default function Home() {
     let target: Unit | Building | undefined = visibleEnemies.sort((a, b) => distance(a, point) - distance(b, point))[0];
     if (target) { const radius = "complete" in target ? buildingFootprintRadius(target) : unitFootprintRadius(target); if (distance(target, point) > radius + 36) target = undefined; }
     const groupCommand = moveCommandRef.current || attackMoveRef.current;
-    const columns = Math.ceil(Math.sqrt(selected.length)); const rows = Math.ceil(selected.length / columns);
+    const formationCommand = selected.length > 1;
+    const columns = Math.ceil(Math.sqrt(selected.length * 1.2)); const rows = Math.ceil(selected.length / columns);
     const isAttackOrder = Boolean(target) || forceAttackMove || attackMoveRef.current;
     if (isAttackOrder) {
       const center = selected.reduce((sum, unit) => ({ x: sum.x + unit.x / selected.length, y: sum.y + unit.y / selected.length }), { x: 0, y: 0 });
@@ -2191,7 +2219,7 @@ export default function Home() {
     // Una orden común sobre varias unidades conserva destino y velocidad propios.
     const groupPace = groupCommand && selected.length > 1 ? Math.min(...selected.map(unit => UNIT_SPEC[unit.type].speed)) : undefined;
     const formationCenter = selected.reduce((sum, unit) => ({ x: sum.x + unit.x / selected.length, y: sum.y + unit.y / selected.length }), { x: 0, y: 0 });
-    const formationRoute = groupCommand ? routeAroundTerrain(formationCenter, target || point) : undefined;
+    const formationRoute = formationCommand ? routeAroundTerrain(formationCenter, target || point) : undefined;
     const formationWaypoints = (lateral: number, depth: number, radius: number) => {
       if (!formationRoute?.length) return [];
       return formationRoute.map((anchor, routeIndex) => {
@@ -2207,12 +2235,12 @@ export default function Home() {
     const targetRadius = target ? ("complete" in target ? buildingFootprintRadius(target) : unitFootprintRadius(target)) : 0;
     const occupiedSlots: Array<{ unit: Unit; point: Point }> = [];
     const slotIsClear = (unit: Unit, candidate: Point) => {
-      const footprint = unitFootprintRadius(unit);
-      if (candidate.x < footprint || candidate.x > WORLD.w - footprint || candidate.y < footprint || candidate.y > WORLD.h - footprint) return false;
+      const footprint = unitFootprintRadius(unit), formationRadius = formationUnitRadius(unit);
+      if (candidate.x < formationRadius || candidate.x > WORLD.w - formationRadius || candidate.y < formationRadius || candidate.y > WORLD.h - formationRadius) return false;
       if (UNIT_SPEC[unit.type].armor !== "air" && hasGroundNavigation() && !urbanWalkable(candidate)) return false;
       if (UNIT_SPEC[unit.type].armor !== "air" && !hasGroundNavigation() && activeProfile().obstacles.some(obstacle => distance(candidate, obstacle) < obstacle.r + footprint + 4)) return false;
-      if (buildingsRef.current.some(building => building.complete && distance(candidate, building) < buildingFootprintRadius(building) + footprint + 8)) return false;
-      if (occupiedSlots.some(occupied => distance(candidate, occupied.point) < footprint + unitFootprintRadius(occupied.unit) + 16)) return false;
+      if (buildingsRef.current.some(building => building.complete && distance(candidate, building) < buildingFootprintRadius(building) + formationRadius + 8)) return false;
+      if (occupiedSlots.some(occupied => distance(candidate, occupied.point) < formationRadius + formationUnitRadius(occupied.unit) + 12)) return false;
       return routeForUnit(unit, candidate).length > 0;
     };
     const nearestValidSlot = (unit: Unit, preferred: Point) => {
@@ -2232,9 +2260,11 @@ export default function Home() {
       const approachAngle = Math.atan2(formationCenter.y - (target?.y ?? point.y), formationCenter.x - (target?.x ?? point.x));
       const attackArc = Math.min(Math.PI * 1.55, Math.max(Math.PI * .62, (orderedSelected.length - 1) * .42));
       const slotAngle = approachAngle + (orderedSelected.length > 1 ? (index / (orderedSelected.length - 1) - .5) * attackArc : 0);
-      const minimumAttackRadius = targetRadius + unitRadius + 10;
+      const formationRadius = formationUnitRadius(unit);
+      const minimumAttackRadius = targetRadius + formationRadius + 14;
       const minRange = UNIT_SPEC[unit.type].minRange ?? 0;
-      const preferredAttackRadius = Math.max(minimumAttackRadius, minRange ? minRange + 34 : 0);
+      const tacticalRange = UNIT_SPEC[unit.type].range > 0 ? UNIT_SPEC[unit.type].range * (UNIT_SPEC[unit.type].armor === "heavy" ? .72 : UNIT_SPEC[unit.type].armor === "medium" ? .68 : .64) : 0;
+      const preferredAttackRadius = Math.max(minimumAttackRadius, minRange ? minRange + 34 : 0, tacticalRange);
       const maximumAttackRadius = Math.max(minimumAttackRadius, UNIT_SPEC[unit.type].range - 12);
       const attackRadius = Math.min(preferredAttackRadius, maximumAttackRadius);
       const preferredTarget = target
@@ -2244,7 +2274,7 @@ export default function Home() {
       if (!formationTarget) return { unit, order: undefined as UnitOrder | undefined };
       occupiedSlots.push({ unit, point: formationTarget });
       const destination = { x: clamp(formationTarget.x, UNIT_SPEC[unit.type].radius, WORLD.w - UNIT_SPEC[unit.type].radius), y: clamp(formationTarget.y, UNIT_SPEC[unit.type].radius, WORLD.h - UNIT_SPEC[unit.type].radius) };
-      const sharedRoute = groupCommand ? formationWaypoints(lateral, depth, UNIT_SPEC[unit.type].radius) : undefined;
+      const sharedRoute = formationCommand ? formationWaypoints(lateral, depth, UNIT_SPEC[unit.type].radius) : undefined;
       const route = sharedRoute?.length ? [...sharedRoute.slice(0, -1), destination] : routeForUnit(unit, destination);
       return { unit, order: { kind: target ? "attack" : isAttackOrder ? "attackMove" : "move", targetId: target?.id, waypoints: route, groupPace, formationSlot: { ...destination } } as UnitOrder };
     });
@@ -2528,7 +2558,15 @@ export default function Home() {
       if (building.side === "human") { const telemetry = telemetryRef.current; telemetry.producedUnits += 1; if (["light", "medium", "heavy"].includes(UNIT_SPEC[type].armor)) telemetry.armoredUnits += 1; if (telemetry.firstReinforcementAt === undefined) telemetry.firstReinforcementAt = gameTimeRef.current; pushAlert(UNIT_SPEC[type].name + " desplegado desde " + BUILDING_SPEC[building.type].name + ".", spawnPoint, "complete"); playSfx("deploy", spawnPoint); }
     };
     const updateBuildings = (dt: number) => { const modeConfig = MODE_CONFIG[gameModeRef.current]; for (const building of buildingsRef.current) { if (!building.complete) { building.buildRemaining -= dt * modeConfig.construction; if (Math.random() < dt * 1.8) addParticle("dust", { x: building.x + (Math.random() - 0.5) * 70, y: building.y + (Math.random() - 0.5) * 55 }, 24, .55); if (building.buildRemaining <= 0) { building.buildRemaining = 0; building.complete = true; recalcPower(building.ownerId, building.side); if (building.side === "human") { pushAlert(BUILDING_SPEC[building.type].name + " operativo.", building, "complete"); playSfx("build", building); } } continue; } building.door = Math.max(0, building.door - dt * .72); const economy = economyFor(building.ownerId, building.side), powered = economy.powerUsed <= economy.powerCap; if (!building.active && building.queue.length) { const type = building.queue.shift(); if (type) building.active = { type, remaining: UNIT_SPEC[type].buildTime, total: UNIT_SPEC[type].buildTime }; } if (building.active) { building.active.remaining -= dt * (powered ? modeConfig.production : .25); if (building.active.remaining < 1.8) building.door = Math.max(building.door, 1 - building.active.remaining / 1.8); if (building.active.remaining <= 0) { const type = building.active.type; building.active = undefined; spawnFrom(building, type); } } } };
-    const setUnitDestination = (unit: Unit, point: Point, kind: UnitOrder["kind"] = "move", targetId?: number) => { unit.order = { kind, targetId, waypoints: routeForUnit(unit, point) }; };
+    const setUnitDestination = (unit: Unit, point: Point, kind: UnitOrder["kind"] = "move", targetId?: number) => {
+      const destination = { x: clamp(point.x, UNIT_SPEC[unit.type].radius, WORLD.w - UNIT_SPEC[unit.type].radius), y: clamp(point.y, UNIT_SPEC[unit.type].radius, WORLD.h - UNIT_SPEC[unit.type].radius) };
+      const route = routeForUnit(unit, destination);
+      if (!route.length) return false;
+      unit.order = { kind, targetId, waypoints: route, formationSlot: { ...destination } };
+      unit.formationSlot = { ...destination };
+      syncSpaceSpriteDirectionToOrder(unit, unit.order);
+      return true;
+    };
     const staticPositionClear = (unit: Unit, point: Point) => {
       const spec = UNIT_SPEC[unit.type];
       const footprint = unitFootprintRadius(unit);
@@ -2703,9 +2741,26 @@ export default function Home() {
         .filter(unit => unit.side === "human" && unit.hp > 0 && (distance(unit, machineHqRef.current) <= AI_BASE_DEFENSE_RADIUS || assets.some(asset => distance(unit, asset) <= (asset.type === "hq" ? AI_BASE_DEFENSE_RADIUS : AI_ASSET_DEFENSE_RADIUS))))
         .sort((a, b) => Number(humanAttackingMachineAsset(b)) - Number(humanAttackingMachineAsset(a)) || distance(a, machineHqRef.current) - distance(b, machineHqRef.current));
     };
-    const guardDestination = (index: number, total: number) => {
-      const hq = machineHqRef.current, baseAngle = Math.atan2(hq.y - humanHqRef.current.y, hq.x - humanHqRef.current.x), angle = baseAngle + (index - (total - 1) / 2) * .38;
-      return { x: clamp(hq.x - Math.cos(angle) * (260 + (index % 2) * 72), 60, WORLD.w - 60), y: clamp(hq.y - Math.sin(angle) * (210 + Math.floor(index / 2) * 42), 60, WORLD.h - 60) };
+    const findAiFormationSlot = (unit: Unit, preferred: Point, occupied: Array<{ unit: Unit; point: Point }>) => {
+      const formationRadius = formationUnitRadius(unit);
+      const candidates = [{ ...preferred }];
+      for (const radius of [72, 126, 188, 258]) for (let step = 0; step < 12; step++) {
+        const angle = step / 12 * Math.PI * 2 + (unit.id % 7) * .09;
+        candidates.push({ x: preferred.x + Math.cos(angle) * radius, y: preferred.y + Math.sin(angle) * radius });
+      }
+      return candidates.map(candidate => ({ x: clamp(candidate.x, formationRadius, WORLD.w - formationRadius), y: clamp(candidate.y, formationRadius, WORLD.h - formationRadius) }))
+        .find(candidate => staticPositionClear(unit, candidate) && !occupied.some(slot => distance(candidate, slot.point) < formationRadius + formationUnitRadius(slot.unit) + 12));
+    };
+    const guardDestination = (unit: Unit, index: number, total: number, occupied: Array<{ unit: Unit; point: Point }>) => {
+      const hq = machineHqRef.current;
+      const facingHuman = Math.atan2(humanHqRef.current.y - hq.y, humanHqRef.current.x - hq.x);
+      const normalized = total > 1 ? index / (total - 1) - .5 : 0;
+      const spread = Math.min(Math.PI * 1.18, Math.max(Math.PI * .72, total * .24));
+      const ring = index % 3;
+      const radius = 360 + ring * 92 + Math.floor(index / 6) * 56;
+      const angle = facingHuman + normalized * spread;
+      const preferred = { x: hq.x + Math.cos(angle) * radius, y: hq.y + Math.sin(angle) * radius };
+      return findAiFormationSlot(unit, preferred, occupied) || preferred;
     };
     const activateAiBaseDefense = (threats: Unit[], anchor: Point) => {
       if (!threats.length) return;
@@ -2726,9 +2781,12 @@ export default function Home() {
         if (now >= defense.nextThink) {
           const combat = machineCombatUnits(), guardIds = machineGuardIds(combat);
           const guards = combat.filter(unit => guardIds.has(unit.id) || unit.order?.kind === "defend");
+          const occupiedGuardSlots: Array<{ unit: Unit; point: Point }> = [];
           guards.forEach((unit, index) => {
-            if (unit.order?.kind === "attack" || unit.order?.kind === "attackMove" || !unit.order?.waypoints.length || distance(unit, machineHqRef.current) > AI_BASE_DEFENSE_RADIUS * .88) {
-              setUnitDestination(unit, guardDestination(index, guards.length), "defend");
+            const destination = guardDestination(unit, index, guards.length, occupiedGuardSlots);
+            occupiedGuardSlots.push({ unit, point: destination });
+            if (unit.order?.kind === "attack" || unit.order?.kind === "attackMove" || !unit.order?.waypoints.length || distance(unit, machineHqRef.current) > AI_BASE_DEFENSE_RADIUS * .88 || !unit.formationSlot || distance(unit.formationSlot, destination) > 70) {
+              setUnitDestination(unit, destination, "defend");
             }
           });
           defense.threatIds = []; defense.nextThink = now + 3.5;
@@ -2748,14 +2806,21 @@ export default function Home() {
         .filter(unit => unit.order?.kind === "defend" || distance(unit, machineHqRef.current) <= AI_DEFENSE_LEASH || distance(unit, defense.anchor) <= AI_DEFENSE_LEASH || distance(unit, threats[0]) <= AI_DEFENSE_LEASH)
         .sort((a, b) => Math.min(...threats.map(threat => distance(a, threat))) - Math.min(...threats.map(threat => distance(b, threat))))
         .slice(0, Math.max(2, Math.min(8, Math.ceil(units.length * .68))));
+      const occupiedDefenseSlots: Array<{ unit: Unit; point: Point }> = [];
       defenders.forEach((unit, index) => {
-        const threat = threats[index % threats.length], spec = UNIT_SPEC[unit.type], angle = Math.atan2(threat.y - unit.y, threat.x - unit.x), side = index % 2 ? 1 : -1;
-        const standoff = spec.range > 0 ? clamp(spec.range * .62, spec.radius + 34, 260) : spec.radius + 58;
-        const destination = { x: clamp(threat.x - Math.cos(angle) * standoff + Math.cos(angle + Math.PI / 2) * side * 38, spec.radius, WORLD.w - spec.radius), y: clamp(threat.y - Math.sin(angle) * standoff + Math.sin(angle + Math.PI / 2) * side * 38, spec.radius, WORLD.h - spec.radius) };
+        const threat = threats[index % threats.length], spec = UNIT_SPEC[unit.type];
+        const approach = Math.atan2(machineHqRef.current.y - threat.y, machineHqRef.current.x - threat.x);
+        const normalized = defenders.length > 1 ? index / (defenders.length - 1) - .5 : 0;
+        const spread = Math.min(Math.PI * 1.15, Math.max(Math.PI * .55, defenders.length * .18));
+        const angle = approach + normalized * spread;
+        const standoff = spec.range > 0 ? clamp(spec.range * .68, formationUnitRadius(unit) + 42, 330) : formationUnitRadius(unit) + 72;
+        const preferred = { x: threat.x + Math.cos(angle) * standoff, y: threat.y + Math.sin(angle) * standoff };
+        const destination = findAiFormationSlot(unit, preferred, occupiedDefenseSlots) || preferred;
+        occupiedDefenseSlots.push({ unit, point: destination });
         setUnitDestination(unit, destination, "defend", threat.id);
       });
     };
-    const updateAi = (dt: number) => { AI_BUILD_PLAN.forEach((_, index) => completeAiBuilding(index)); aiThinkRef.current -= dt; if (aiThinkRef.current <= 0) { aiThinkRef.current = 7.5; const phase = aiRef.current.phase, machineUnits = unitsRef.current.filter(unit => unit.side === "machine").length, modeConfig = MODE_CONFIG[gameModeRef.current], difficultyConfig = DIFFICULTY_CONFIG[operationRef.current.difficulty], scenarioRule = SCENARIO_RULES[operationRef.current.scenario]; const baseForceCap = (phase === "mobilizing" ? modeConfig.forceCap[0] : phase === "preparing" ? modeConfig.forceCap[1] : modeConfig.forceCap[2]) + (phase === "assault" ? aiRef.current.wave * 2 : 0); const forceCap = Math.max(4, Math.round(baseForceCap * difficultyConfig.forceScale * (scenarioRule?.forceScale || 1))); const desired: UnitType[] = aiRef.current.wave < 1 ? ["rifle", "antitank", "recon", "apc"] : aiRef.current.wave < 3 ? ["rifle", "antitank", "apc", "tank", "reconDrone"] : ["antitank", "tank", "artillery", "attackDrone", "apc"]; if (machineUnits < forceCap) for (const building of buildingsRef.current.filter(item => item.side === "machine" && item.complete && BUILDING_SPEC[item.type].produces)) { if (building.queue.length + (building.active ? 1 : 0) >= (phase === "regrouping" ? 2 : 1)) continue; const options = desired.filter(type => UNIT_SPEC[type].producer === building.type); if (options.length) queueUnit(building.id, options[Math.floor(Math.random() * options.length)], "machine"); } } const ai = aiRef.current, modeConfig = MODE_CONFIG[gameModeRef.current], difficultyConfig = DIFFICULTY_CONFIG[operationRef.current.difficulty], scenarioRule = SCENARIO_RULES[operationRef.current.scenario]; if (gameTimeRef.current < ai.phaseEnds) return; if (ai.phase === "mobilizing") { const warningTime = Math.max(18, Math.round(modeConfig.warning * difficultyConfig.warningScale * (scenarioRule?.warningScale || 1))); ai.phase = "preparing"; ai.phaseEnds = gameTimeRef.current + warningTime; ai.doctrine = "Concentración de fuerzas"; unitsRef.current.filter(unit => unit.side === "machine").forEach((unit, index) => setUnitDestination(unit, { x: ai.staging.x + (index % 4) * 58, y: ai.staging.y + Math.floor(index / 4) * 58 })); setMessage("Terminó el desarrollo. La IA concentra fuerzas: tenés " + warningTime + " segundos de alerta."); return; } if (ai.phase === "preparing") { ai.phase = "assault"; ai.phaseEnds = gameTimeRef.current + Math.max(28, Math.round(modeConfig.assault * difficultyConfig.assaultScale * (scenarioRule?.assaultScale || 1))); ai.wave += 1; const candidates = buildingsRef.current.filter(item => item.side === "human" && item.complete && item.type !== "hq"); const target = candidates.length ? candidates.sort((a, b) => distance(a, machineHqRef.current) - distance(b, machineHqRef.current))[0] : buildingsRef.current.find(item => item.side === "human" && item.type === "hq"); ai.targetId = target?.id; ai.doctrine = target && BUILDING_SPEC[target.type].extractor ? "Interdicción logística" : ai.wave % 2 ? "Ataque sobre infraestructura" : "Penetración blindada"; if (target) unitsRef.current.filter(unit => unit.side === "machine" && unit.type !== "reconDrone").forEach((unit, index) => setUnitDestination(unit, { x: target.x + (index % 5) * 34, y: target.y + Math.floor(index / 5) * 34 }, "attack", target.id)); setMessage("Alerta: comenzó el ataque. Objetivo probable: " + (target ? BUILDING_SPEC[target.type].name : "centro de mando") + "."); playSfx("error"); return; } if (ai.phase === "assault") { ai.phase = "regrouping"; ai.phaseEnds = gameTimeRef.current + modeConfig.regroup; ai.doctrine = "Reposición y reparación"; unitsRef.current.filter(unit => unit.side === "machine").forEach((unit, index) => setUnitDestination(unit, { x: machineHqRef.current.x + (machineHqRef.current.x < WORLD.w / 2 ? 1 : -1) * (310 + (index % 5) * 58), y: machineHqRef.current.y + (machineHqRef.current.y < WORLD.h / 2 ? 1 : -1) * (220 + Math.floor(index / 5) * 58) }, "retreat")); setMessage("La fuerza enemiga se repliega. Es tu ventana para reparar, explorar o contraatacar."); return; } ai.phase = "preparing"; ai.phaseEnds = gameTimeRef.current + Math.max(20, Math.round((modeConfig.warning - Math.min(16, ai.wave * 3)) * difficultyConfig.warningScale * (scenarioRule?.warningScale || 1))); ai.doctrine = ai.wave % 2 ? "Masa blindada" : "Hostigamiento y sensores"; unitsRef.current.filter(unit => unit.side === "machine").forEach((unit, index) => setUnitDestination(unit, { x: ai.staging.x + (index % 5) * 62, y: ai.staging.y + Math.floor(index / 5) * 62 })); setMessage("La IA prepara otra operación. Explorá para descubrir por dónde llegará."); };
+    const updateAi = (dt: number) => { AI_BUILD_PLAN.forEach((_, index) => completeAiBuilding(index)); aiThinkRef.current -= dt; if (aiThinkRef.current <= 0) { aiThinkRef.current = 7.5; const phase = aiRef.current.phase, machineUnits = unitsRef.current.filter(unit => unit.side === "machine").length, modeConfig = MODE_CONFIG[gameModeRef.current], difficultyConfig = DIFFICULTY_CONFIG[operationRef.current.difficulty], scenarioRule = SCENARIO_RULES[operationRef.current.scenario]; const baseForceCap = (phase === "mobilizing" ? modeConfig.forceCap[0] : phase === "preparing" ? modeConfig.forceCap[1] : modeConfig.forceCap[2]) + (phase === "assault" ? aiRef.current.wave * 2 : 0); const forceCap = Math.max(4, Math.round(baseForceCap * difficultyConfig.forceScale * (scenarioRule?.forceScale || 1))); const desired: UnitType[] = aiRef.current.wave < 1 ? ["rifle", "antitank", "recon", "apc"] : aiRef.current.wave < 3 ? ["rifle", "antitank", "apc", "tank", "reconDrone"] : ["antitank", "tank", "artillery", "attackDrone", "apc"]; if (machineUnits < forceCap) for (const building of buildingsRef.current.filter(item => item.side === "machine" && item.complete && BUILDING_SPEC[item.type].produces)) { if (building.queue.length + (building.active ? 1 : 0) >= (phase === "regrouping" ? 2 : 1)) continue; const options = desired.filter(type => UNIT_SPEC[type].producer === building.type); if (options.length) queueUnit(building.id, options[Math.floor(Math.random() * options.length)], "machine"); } } const ai = aiRef.current, modeConfig = MODE_CONFIG[gameModeRef.current], difficultyConfig = DIFFICULTY_CONFIG[operationRef.current.difficulty], scenarioRule = SCENARIO_RULES[operationRef.current.scenario]; if (gameTimeRef.current < ai.phaseEnds) return; if (ai.phase === "mobilizing") { const warningTime = Math.max(18, Math.round(modeConfig.warning * difficultyConfig.warningScale * (scenarioRule?.warningScale || 1))); ai.phase = "preparing"; ai.phaseEnds = gameTimeRef.current + warningTime; ai.doctrine = "Concentración de fuerzas"; const stagingUnits = unitsRef.current.filter(unit => unit.side === "machine"); const stagingSpacing = formationSpacingFor(stagingUnits); const stagingColumns = Math.ceil(Math.sqrt(stagingUnits.length || 1)); stagingUnits.forEach((unit, index) => setUnitDestination(unit, { x: ai.staging.x + (index % stagingColumns - (stagingColumns - 1) / 2) * stagingSpacing, y: ai.staging.y + (Math.floor(index / stagingColumns) - .5) * stagingSpacing })); setMessage("Terminó el desarrollo. La IA concentra fuerzas: tenés " + warningTime + " segundos de alerta."); return; } if (ai.phase === "preparing") { ai.phase = "assault"; ai.phaseEnds = gameTimeRef.current + Math.max(28, Math.round(modeConfig.assault * difficultyConfig.assaultScale * (scenarioRule?.assaultScale || 1))); ai.wave += 1; const candidates = buildingsRef.current.filter(item => item.side === "human" && item.complete && item.type !== "hq"); const target = candidates.length ? candidates.sort((a, b) => distance(a, machineHqRef.current) - distance(b, machineHqRef.current))[0] : buildingsRef.current.find(item => item.side === "human" && item.type === "hq"); ai.targetId = target?.id; ai.doctrine = target && BUILDING_SPEC[target.type].extractor ? "Interdicción logística" : ai.wave % 2 ? "Ataque sobre infraestructura" : "Penetración blindada"; if (target) { const assaultUnits = unitsRef.current.filter(unit => unit.side === "machine" && unit.type !== "reconDrone"); const assaultArc = Math.min(Math.PI * 1.45, Math.max(Math.PI * .72, assaultUnits.length * .20)); assaultUnits.forEach((unit, index) => { const spec = UNIT_SPEC[unit.type], approach = Math.atan2(machineHqRef.current.y - target.y, machineHqRef.current.x - target.x), normalized = assaultUnits.length > 1 ? index / (assaultUnits.length - 1) - .5 : 0, angle = approach + normalized * assaultArc; const radius = buildingFootprintRadius(target) + formationUnitRadius(unit) + Math.min(Math.max(18, spec.range * .52), 260); setUnitDestination(unit, { x: target.x + Math.cos(angle) * radius, y: target.y + Math.sin(angle) * radius }, "attack", target.id); }); } setMessage("Alerta: comenzó el ataque. Objetivo probable: " + (target ? BUILDING_SPEC[target.type].name : "centro de mando") + "."); playSfx("error"); return; } if (ai.phase === "assault") { ai.phase = "regrouping"; ai.phaseEnds = gameTimeRef.current + modeConfig.regroup; ai.doctrine = "Reposición y reparación"; const regroupUnits = unitsRef.current.filter(unit => unit.side === "machine"); const regroupSpacing = formationSpacingFor(regroupUnits); const regroupColumns = Math.ceil(Math.sqrt(regroupUnits.length || 1)); const retreatDirection = machineHqRef.current.x < WORLD.w / 2 ? 1 : -1; regroupUnits.forEach((unit, index) => setUnitDestination(unit, { x: machineHqRef.current.x + retreatDirection * (360 + Math.floor(index / regroupColumns) * regroupSpacing), y: machineHqRef.current.y + (index % regroupColumns - (regroupColumns - 1) / 2) * regroupSpacing }, "retreat")); setMessage("La fuerza enemiga se repliega. Es tu ventana para reparar, explorar o contraatacar."); return; } ai.phase = "preparing"; ai.phaseEnds = gameTimeRef.current + Math.max(20, Math.round((modeConfig.warning - Math.min(16, ai.wave * 3)) * difficultyConfig.warningScale * (scenarioRule?.warningScale || 1))); ai.doctrine = ai.wave % 2 ? "Masa blindada" : "Hostigamiento y sensores"; const preparingUnits = unitsRef.current.filter(unit => unit.side === "machine"); const preparingSpacing = formationSpacingFor(preparingUnits); const preparingColumns = Math.ceil(Math.sqrt(preparingUnits.length || 1)); preparingUnits.forEach((unit, index) => setUnitDestination(unit, { x: ai.staging.x + (index % preparingColumns - (preparingColumns - 1) / 2) * preparingSpacing, y: ai.staging.y + Math.floor(index / preparingColumns) * preparingSpacing })); setMessage("La IA prepara otra operación. Explorá para descubrir por dónde llegará."); };
     const fire = (attacker: Unit | Building, target: Unit | Building, sourceType: UnitType | "turret", damage: number, damageType: DamageType, speed: number) => { const angle = Math.atan2(target.y - attacker.y, target.x - attacker.x); const x = attacker.x + Math.cos(angle) * 24, y = attacker.y + Math.sin(angle) * 24; projectilesRef.current.push({ id: nextId(), side: attacker.side, sourceType, sourceId: attacker.id, targetId: target.id, x, y, trailX: x - Math.cos(angle) * 34, trailY: y - Math.sin(angle) * 34, damage, damageType, speed, age: 0 }); if (!("complete" in attacker)) attacker.recoil = sourceType === "tank" || sourceType === "artillery" ? 1 : .52; addParticle("flash", { x: attacker.x + Math.cos(angle) * 26, y: attacker.y + Math.sin(angle) * 26 }, sourceType === "tank" || sourceType === "artillery" ? 40 : 18, sourceType === "tank" || sourceType === "artillery" ? .24 : .13); if (sourceType === "tank" || sourceType === "artillery") { addParticle("smoke", { x: attacker.x + Math.cos(angle) * 22, y: attacker.y + Math.sin(angle) * 22 }, 22, 1.1); playSfx("cannon", attacker); } else if (sourceType === "antitank" || sourceType === "attackDrone") playSfx("missile", attacker); else playSfx("rifle", attacker); };
     const targetArmor = (target: Unit | Building): ArmorType => "complete" in target ? "structure" : UNIT_SPEC[target.type].armor;
     const updateCombatAndMovement = (dt: number) => {
@@ -2771,24 +2836,53 @@ export default function Home() {
         // Al detenerse, una formación conserva su slot final. Si una colisión
         // suave la desplazó, retoma ese lugar por ruta normal en vez de quedar
         // amontonada o teletransportarse al centro de la orden.
-        if (!unit.order && unit.formationSlot && distance(unit, unit.formationSlot) > Math.max(18, unitFootprintRadius(unit) * .62) && staticPositionClear(unit, unit.formationSlot)) {
+        if (!unit.order && unit.formationSlot && distance(unit, unit.formationSlot) > Math.max(10, formationUnitRadius(unit) * .34) && staticPositionClear(unit, unit.formationSlot)) {
           const settlingRoute = routeForUnit(unit, unit.formationSlot);
           if (settlingRoute.length) unit.order = { kind: "move", waypoints: settlingRoute, formationSlot: { ...unit.formationSlot } };
         }
-        let target = unit.order?.targetId ? findObject(unit.order.targetId) : undefined;
+        const orderedTarget = unit.order?.targetId ? findObject(unit.order.targetId) : undefined;
+        let target = orderedTarget;
         if (target && (target.hp <= 0 || !canManuallyAttack(unit, target))) { target = undefined; if (unit.order) unit.order.targetId = undefined; }
         const followingDirectMove = unit.order?.kind === "move" && unit.order.waypoints.length > 0;
         const canAcquireTargets = !developmentPhase || unit.side === "human" || humanInitiatedHostilitiesRef.current;
+        const canWeaponEngage = (enemy: Unit | Building) => {
+          const armor = targetArmor(enemy);
+          return !(armor === "air" && (spec.damageType === "kinetic" || spec.damageType === "explosive"));
+        };
+        // Una orden contra infraestructura no vuelve ciegas a las tropas. Si una
+        // unidad hostil les dispara (o ataca a un aliado inmediato), la amenaza
+        // armada toma prioridad local. La orden original sobre el edificio queda
+        // intacta y se retoma automáticamente cuando desaparece la amenaza.
+        if (canAcquireTargets && orderedTarget && "complete" in orderedTarget && spec.damage > 0) {
+          const incomingSources = new Set(projectilesRef.current.filter(projectile => projectile.side !== unit.side && projectile.targetId === unit.id && projectile.sourceId !== undefined).map(projectile => projectile.sourceId!));
+          const responseRadius = Math.max(190, spec.range * 1.12);
+          const hostileUnits = unitsRef.current.filter(enemy => isHostileTo(unit, enemy) && enemy.hp > 0 && canWeaponEngage(enemy) && (unit.side === "machine" || visibleToHuman(enemy)));
+          const tacticalThreat = hostileUnits.map(enemy => {
+            const enemyTargetId = enemy.order?.targetId;
+            const direct = incomingSources.has(enemy.id) || enemyTargetId === unit.id;
+            const supportedAlly = enemyTargetId ? unitsRef.current.find(ally => ally.id === enemyTargetId && ally.side === unit.side && ally.hp > 0 && distance(unit, ally) <= responseRadius * .72) : undefined;
+            const nearby = distance(unit, enemy) <= responseRadius;
+            const score = direct ? 0 : supportedAlly ? 1 : nearby ? 2 : 9;
+            return { enemy, score, range: distance(unit, enemy) };
+          }).filter(candidate => candidate.score < 9).sort((a, b) => a.score - b.score || a.range - b.range)[0];
+          if (tacticalThreat) target = tacticalThreat.enemy;
+        }
         if (!target && canAcquireTargets && !followingDirectMove && unit.order?.kind !== "retreat" && spec.damage > 0) {
           const enemies: Array<Unit | Building> = [...unitsRef.current.filter(item => isHostileTo(unit, item)), ...buildingsRef.current.filter(item => item.complete && isHostileTo(unit, item))];
-          target = enemies.filter(enemy => { const armor = targetArmor(enemy); if (armor === "air" && (spec.damageType === "kinetic" || spec.damageType === "explosive")) return false; const targetDistance = distance(unit, enemy); const outsideMinRange = !spec.minRange || targetDistance >= spec.minRange; return targetDistance <= spec.range && outsideMinRange && (unit.side === "machine" || visibleToHuman(enemy)); }).sort((a, b) => distance(unit, a) - distance(unit, b))[0];
+          target = enemies.filter(enemy => { if (!canWeaponEngage(enemy)) return false; const targetDistance = distance(unit, enemy); const outsideMinRange = !spec.minRange || targetDistance >= spec.minRange; return targetDistance <= spec.range && outsideMinRange && (unit.side === "machine" || visibleToHuman(enemy)); }).sort((a, b) => Number("complete" in a) - Number("complete" in b) || distance(unit, a) - distance(unit, b))[0];
           if (!target && unit.type === "artillery") target = enemies.filter(enemy => { const armor = targetArmor(enemy); return (armor === "infantry" || armor === "light") && distance(unit, enemy) < 190 && (unit.side === "machine" || visibleToHuman(enemy)); }).sort((a, b) => distance(unit, a) - distance(unit, b))[0];
         }
         const targetDistance = target ? distance(unit, target) : Infinity;
         const artilleryMachineGun = unit.type === "artillery" && targetDistance < (spec.minRange || 0);
         const inRange = target && (artilleryMachineGun ? targetDistance < 190 : targetDistance <= spec.range && targetDistance >= (spec.minRange || 0));
+        const orderedStructureTarget = orderedTarget && orderedTarget.hp > 0 && unit.order?.targetId === orderedTarget.id && "complete" in orderedTarget ? orderedTarget : undefined;
+        const needsFormationSettle = Boolean(orderedStructureTarget && target === orderedStructureTarget && unit.order?.formationSlot && distance(unit, unit.order.formationSlot) > Math.max(12, formationUnitRadius(unit) * .38) && staticPositionClear(unit, unit.order.formationSlot));
+        if (needsFormationSettle && unit.order && unit.order.formationSlot && !unit.order.waypoints.length) {
+          const settlingRoute = routeForUnit(unit, unit.order.formationSlot);
+          if (settlingRoute.length) unit.order.waypoints = settlingRoute;
+        }
         const canFire = unit.side === "human" || machineCanEngage;
-        if (canFire && target && inRange && spec.damage > 0) {
+        if (canFire && target && inRange && spec.damage > 0 && !needsFormationSettle) {
           unit.moveSpeed = Math.max(0, unit.moveSpeed - spec.speed * 2.4 * dt);
           const aimTurnRate = LOCOMOTION_CONFIG[unit.type].aimTurnRate;
           unit.angle += clamp(angleDelta(unit.angle, Math.atan2(target.y - unit.y, target.x - unit.x)), -aimTurnRate * dt, aimTurnRate * dt);
@@ -2834,7 +2928,7 @@ export default function Home() {
         let separateX = 0, separateY = 0;
         for (const other of unitsRef.current) {
           if (other.id === unit.id || other.side !== unit.side) continue;
-          const gap = distance(unit, other), desired = unitFootprintRadius(unit) + unitFootprintRadius(other) + 18;
+          const gap = distance(unit, other), desired = isSpaceScenario() ? formationUnitRadius(unit) + formationUnitRadius(other) + 10 : unitFootprintRadius(unit) + unitFootprintRadius(other) + 18;
           if (gap > 0 && gap < desired) { separateX += (unit.x - other.x) / gap * (desired - gap) / desired; separateY += (unit.y - other.y) / gap * (desired - gap) / desired; }
         }
         for (const building of isAir && !isHoverScenario() ? [] : buildingsRef.current) {
@@ -2942,8 +3036,8 @@ export default function Home() {
       for (let index = 0; index < unitsRef.current.length; index++) for (let otherIndex = index + 1; otherIndex < unitsRef.current.length; otherIndex++) {
         const first = unitsRef.current[index], second = unitsRef.current[otherIndex], firstSpec = UNIT_SPEC[first.type], secondSpec = UNIT_SPEC[second.type];
         if (activeScenario !== "egypt" && (firstSpec.armor === "air" || secondSpec.armor === "air")) continue;
-        const minimum = unitFootprintRadius(first) + unitFootprintRadius(second), gap = distance(first, second);
-        const separationThreshold = activeScenario === "egypt" ? .9 : .72;
+        const minimum = isSpaceScenario() ? formationUnitRadius(first) + formationUnitRadius(second) : unitFootprintRadius(first) + unitFootprintRadius(second), gap = distance(first, second);
+        const separationThreshold = activeScenario === "egypt" ? .9 : isSpaceScenario() ? .82 : .72;
         if (gap >= minimum * separationThreshold) continue;
         const angle = gap > .01 ? Math.atan2(first.y - second.y, first.x - second.x) : (first.id < second.id ? 0 : Math.PI);
         const correction = Math.min((minimum - gap) * (activeScenario === "egypt" ? .56 : .38), activeScenario === "egypt" ? 11 : 7);
@@ -3201,7 +3295,7 @@ export default function Home() {
         const directionalAsset = directionalSpaceAsset(unit) ?? directionalSpaceMachineAsset(unit) ?? (vehicle ? (hoverMission ? directionalGravityVehicleAsset(unit) ?? directionalMegaMachineAsset(unit) ?? directionalHoverAsset(unit) : directionalMegaMachineAsset(unit) ?? directionalVehicleAsset(unit)) : directionalMegaMachineAsset(unit) ?? directionalHoverAsset(unit));
         const flip = directionalAsset?.flip ?? vehiclePose.flip, poseAngle = isSpaceScenario() ? spriteMovementAngle(unit) : vehiclePose.angle;
         const spriteX = unit.x - Math.cos(poseAngle) * recoilOffset, spriteGround = groundY - altitude - suspension - Math.sin(poseAngle) * recoilOffset;
-        const spriteRotation = directionalAsset ? (hovering ? 0 : isSpaceScenario() && unit.side === "machine" ? poseAngle : isSpaceScenario() ? 0 : clamp(angleDelta(vehicleDirectionAngle(directionalAsset.direction), poseAngle) * .45, -.14, .14)) : vehiclePose.rotation;
+        const spriteRotation = directionalAsset ? (hovering ? 0 : isSpaceScenario() && unit.side === "machine" ? machineSpaceSpriteRotation(directionalAsset.direction) : isSpaceScenario() ? 0 : clamp(angleDelta(vehicleDirectionAngle(directionalAsset.direction), poseAngle) * .45, -.14, .14)) : vehiclePose.rotation;
         if (!drawUnitAsset(ctx, unit, spriteX, spriteGround, width, height, flip, 1, spriteRotation, directionalAsset?.key)) drawSprite(ctx, spec.sprite, spriteX, spriteGround - height / 2, width, height, flip);
         if (vehicle && selected) { ctx.strokeStyle = "rgba(113,211,255,.7)"; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(unit.x, groundY - 4); ctx.lineTo(unit.x + Math.cos(poseAngle) * (spec.radius + 22), groundY - 4 + Math.sin(poseAngle) * (spec.radius + 22)); ctx.stroke(); }
       }
